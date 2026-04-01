@@ -1,0 +1,50 @@
+Page{
+    data
+    ref_count
+}
+PTE{            // page table entry
+    page        // pointer to physical page
+    writeable // true or false
+    cow     // true if Copy on Write
+}
+
+// Fork with cow
+function fork(parent):
+    child = new_process()
+    for each virtual_page v in parent.page_table: 
+        pte_parent = parent.page_table[v]
+        pte_child = copy(pte_parent)
+        pte_parent.writeable = false
+        pte_child.writable = false
+        pte_parent.cow = true
+        pte_child.cow = true
+
+        pte_parent.page.red_count += 1
+        child.page_table[v] = pte_child 
+    return child 
+
+// Page Fault Handler
+function handle_page_fault(process, v):
+    pte = process.page_table[v]
+    if pte.cow == true: 
+        old_page = pte.page
+
+        if old_page.ref_count > 1:
+            new_page = allocate_page()
+            copy(new_page.data old_page.data)
+
+            old_page.ref_count -= 1
+            new_page.ref_count = 1
+            pte.page = new_page
+        
+        // writable and remove COW
+        pte.writable = true 
+        pte.cow = false
+    else: 
+        error("segmentation fault")
+
+// Free Process Memory 
+function free_process(process):
+    for each virtual_page v in process.page_table:
+        page = process.page_table[v].page
+        page.ref_count -= 1 
